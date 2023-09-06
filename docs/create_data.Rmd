@@ -1,0 +1,169 @@
+---
+title: "create_data"
+author: "Doug McNeall"
+date: "9/5/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+
+source("~/jules_ppe_gmd/docs/JULES-ES-1p0-common-packages.R")
+source("~/jules_ppe_gmd/docs/JULES-ES-1p0-common-functions.R")
+
+
+## ----------------------------------------------------------------------
+## Data locations and constants
+## ----------------------------------------------------------------------
+#ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
+ensloc_wave00 <- '/data/users/hadaw/JULES_ES_PPE/u-au932/'
+ensloc_wave01 <- '/data/users/hadaw/JULES_ES_PPE/u-ck006/'
+
+ 
+# Some pallete options
+yg = brewer.pal(9, "YlGn")
+ryb = brewer.pal(11, "RdYlBu")
+byr = rev(ryb)
+rb = brewer.pal(11, "RdBu")
+br = rev(rb)
+blues = brewer.pal(9, 'Blues')
+cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+wave00col <- 'skyblue2'
+wave01col <- 'tomato2'
+
+zissou5 <- wes_palette('Zissou1', 5, type = c('discrete', 'continuous'))
+zblue <- makeTransparent(as.character(zissou5)[1], 150)
+zred <- makeTransparent(as.character(zissou5)[5], 150)
+
+ysec = 60*60*24*365
+years <- 1850:2013
+
+
+```
+
+```{r}
+
+global_mean_modern_value_wave00_file <- "~/jules_ppe_gmd/docs/data/global_mean_modern_value_wave00_2022-13-09.rdata"
+load(global_mean_modern_value_wave00_file)
+
+modern_value_stan_file <- "~/jules_ppe_gmd/docs/data/modern_value_stan_2022-09-13.rdata"
+load(modern_value_stan_file)
+  
+Y <- datmat_wave00
+
+Y_nlevel0_ix <- which(is.na(datmat_wave00[,'year']))
+```
+
+```{r}
+# Load up the data
+lhs_i = read.table('~/jules_ppe_gmd/docs/data/lhs_u-ao732.txt', header = TRUE)
+lhs_ii = read.table('~/jules_ppe_gmd/docs/data/lhs_u-ao732a.txt', header = TRUE)
+
+toplevel_ix = 1:499
+
+# The raw input data is a latin hypercube
+lhs = rbind(lhs_i, lhs_ii)[toplevel_ix, ]
+lhs_level0 <- lhs[-Y_nlevel0_ix,]
+
+X = normalize(lhs)
+colnames(X) = colnames(lhs)
+
+X_level0 <- X[-Y_nlevel0_ix,]
+X_nlevel0 <- X[Y_nlevel0_ix,]
+
+d = ncol(X)
+# lower and higher bound on the normalised matrix for visualisation
+rx = rbind(rep(0,32), rep(1,32))
+
+```
+
+```{r, fig.width = 10, fig.height = 10}
+
+low_npp_ix <- which(Y[,'npp_nlim_lnd_sum'] < 1e5)
+# code from https://stackoverflow.com/questions/28182872/how-to-use-different-sets-of-data-in-lower-and-upper-panel-of-pairs-function-in
+
+
+#X <- matrix(runif(300), ncol=3)
+#Y <- matrix(c(sort(runif(100, 0, 10)), 
+#              sort(runif(100, 0, 10)), 
+#              sort(runif(100, 0, 10))), ncol=3)
+
+#pdf(file = 'figs/fig02.pdf', width = 12, height = 10)
+#pdf(file = 'figs/run-failure-pairs.pdf', width = 12, height = 10)
+x1 <- X[low_npp_ix, ]
+x2 <- X_nlevel0
+
+XY <- rbind(x1, x2)
+
+
+pairs(XY,
+      lower.panel=function(x, y, ...) {
+        Xx <- x[seq_len(nrow(x1))] # corresponds to X subset
+        Xy <- y[seq_len(nrow(x1))] # corresponds to X subset
+        #usr <- par("usr"); on.exit(par(usr))
+        #par(usr = c(range(x1[, -ncol(x1)]), range(x1[, -1]))) # set up limits
+        points(Xx, Xy, col = zblue, pch = 19, cex = 0.8)
+       # if(par('mfg')[2] == 1) axis(2) # if left plot, add left axis
+        #if(par('mfg')[1] == ncol(x1)) axis(1) # if bottom plot add bottom axis
+      }, 
+      upper.panel=function(x, y, ...) {
+        Yx <- x[(nrow(x1) + 1):length(x)] # Y subset
+        Yy <- y[(nrow(x1) + 1):length(y)] # Y subset
+        
+        #cntr <- outer(Yx, Yx, FUN='*') # arbitrary function for contour
+       # usr <- par("usr"); on.exit(par(usr))
+        #par(usr = c(range(x2[, -1]), range(x2[, -ncol(x2)]))) # set up limits
+        points(Yx, Yy, col = zred, pch = 19, cex = 0.8)
+        #contour(Yx, Yy, cntr, add=TRUE)
+        #if(par('mfg')[2] == ncol(x2)) axis(4) # if right plot, add right axis
+        #if(par('mfg')[1] == 1) axis(3) # if top plot, add top axis
+      }, 
+      #tick=FALSE, # suppress the default tick marks
+      #line=1,
+      gap = 0,
+      xlim = c(0,1), ylim = c(0,1),
+      labels = 1:d,
+      oma = c(2, 18, 2, 2)) # move the default tick labels off the plot 
+
+reset()
+
+legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.1, bty = 'n')
+legend('topleft', pch = 19, col = c( zred, zblue), legend = c('failed', 'zero carbon cycle'), bty = 'n', inset = 0.02, cex = 1.1 )
+
+#dev.off()
+
+```
+
+## Generate the data to save
+
+```{r}
+
+Y_char <- rep('RAN', nrow(X))
+
+Y_char[Y_nlevel0_ix] <- 'CRASHED'
+Y_char[low_npp_ix] <- 'LOWCARBON'
+
+Y_factor <- as.factor(Y_char)
+
+wave0_summary_raw <- cbind(lhs, Y, Y_factor)
+wave0_summary_df <- cbind(X, Y, Y_factor)
+
+```
+
+
+```{r}
+
+save(lhs, X, Y, Y_char, Y_factor, wave0_summary_raw, wave0_summary_df,  file = 'data/wave0_summary.RData')
+
+
+```
+
+
+
+
