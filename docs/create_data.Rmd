@@ -151,19 +151,28 @@ Y_char[low_npp_ix] <- 'LOWCARBON'
 
 Y_factor <- as.factor(Y_char)
 
-wave0_summary_raw <- cbind(lhs, Y, Y_factor)
-wave0_summary_df <- cbind(X, Y, Y_factor)
+wave0_summary_df <- cbind(X, Y, Y_char, Y_factor)
 
 ```
 
 
 ```{r}
 
-save(lhs, X, Y, Y_char, Y_factor, wave0_summary_raw, wave0_summary_df,  file = 'data/wave0_summary.RData')
+save(lhs, X, Y, Y_char, Y_factor, wave0_summary_df,  file = 'data/wave0_summary.RData')
 
 
 ```
 
+## Data checks
+
+Have we got the factors right?
+
+```{r}
+
+cbind(Y[, 'npp_nlim_lnd_sum'], Y_char)
+
+
+```
 
 
 
