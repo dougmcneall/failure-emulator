@@ -1,0 +1,130 @@
+---
+title: "failure-randomforest"
+author: "Doug McNeall"
+date: "9/14/2023"
+output: html_document
+---
+
+
+Using a randomForest to find lowcarbon and crash locations in the JULES ensemble. 
+
+Useful tutorial for random forests in R:  
+https://www.r-bloggers.com/2021/04/random-forest-in-r/
+```{r}
+```
+
+
+```{r}
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+set.seed(42)
+
+library(RColorBrewer)
+library(e1071)
+library(MASS)
+library(caret)
+
+library(randomForest)
+
+```
+
+```{r}
+load('data/wave0_summary.RData')
+
+```
+
+```{r}
+
+
+data_df <- data.frame(X, y = as.factor(Y_char))
+
+ix_train <- 1:399
+ix_test <- 400:499
+
+train <- data_df[ix_train, ]
+test <- data_df[ix_test, ]
+
+```
+
+
+```{r}
+
+rf <- randomForest(y~., data=train, proximity=TRUE)
+print(rf)
+
+```
+
+```{r}
+p1 <- predict(rf, train)
+confusionMatrix(p1, train$y)
+```
+
+```{r}
+
+p2 <- predict(rf, test)
+confusionMatrix(p2, test$y)
+
+```
+
+```{r}
+
+plot(rf)
+
+
+```
+
+
+```{r}
+t <- tuneRF(train[,-5], train[,5],
+       stepFactor = 0.5,
+       plot = TRUE,
+       ntreeTry = 150,
+       trace = TRUE,
+       improve = 0.05)
+
+```
+
+
+```{r}
+hist(treesize(rf),
+     main = "No. of Nodes for the Trees",
+     col = "grey")
+
+```
+
+```{r}
+
+
+
+#Variable Importance
+varImpPlot(rf,
+           sort = T,
+           n.var = 10,
+           main = "Top 10 - Variable Importance")
+
+```
+
+
+```{r}
+importance(rf)
+#MeanDecreaseGini
+```
+
+
+```{r}
+
+partialPlot(rf, train, f0_io)
+
+```
+
+```{r}
+
+partialPlot(rf, train, b_wl_io)
+
+```
