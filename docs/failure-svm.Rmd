@@ -21,8 +21,7 @@ library(e1071)
 library(MASS)
 library(caret)
 
-library(randomForest)
-library(datasets)
+
 
 
 ```
@@ -82,7 +81,7 @@ reset <- function()
 reset()
 
 legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.1, bty = 'n')
-legend('topleft', pch = 19, col = c('red', 'blue'), legend = c('failed', 'zero carbon cycle'), bty = 'n', inset = 0.02, cex = 1.1 )
+legend('topleft', pch = 19, col = c('red', 'blue'), legend = c('CRASHED', 'LOWCARBON'), bty = 'n', inset = 0.02, cex = 1.1 )
 
 ```
 
