@@ -175,4 +175,139 @@ cbind(Y[, 'npp_nlim_lnd_sum'], Y_char)
 ```
 
 
+Wave01 (second wave) specific stuff
+
+```{r}
+# Number of ensemble members (out of 500) to use for training in wave01
+ntrain_wave01 <- 400
+
+# Modern value JULES ensemble Wave01
+nstart <- 499
+nend <- (nstart + ntrain_wave01) - 1
+
+ensemble_wave01_file <- "~/jules_ppe_gmd/docs/data/ensemble_wave01_2023-07-12.rdata"
+load(ensemble_wave01_file )
+
+ens_select_wave01_mv_file <- "~/jules_ppe_gmd/docs/data/ens_select_wave01_mv_file_2023-07-12.rdata"
+
+lhs_wave01 <- read.table( '~/jules_ppe_gmd/docs/data/lhs_example.txt', header = TRUE)
+
+X_wave01 = normalize(lhs_wave01, wrt = rbind(lhs_i, lhs_ii, lhs_wave01))[1:400, ]
+colnames(X_wave01) = colnames(lhs_wave01)
+
+# Modern values that we use for constraints
+```
+
+
+```{r}
+
+plot(1:499, Y[,'nbp_lnd_sum'], xlim = c(1, 900))
+points(500:899,ens_wave01_mv$datmat[,'nbp_lnd_sum'], col = 'red')
+
+
+plot(1:499, Y[,'npp_nlim_lnd_sum'], xlim = c(1, 900))
+points(500:899,ens_wave01_mv$datmat[,'npp_nlim_lnd_sum'], col = 'red')
+
+
+```
+
+
+
+```{r, fig.width = 8, fig.height = 8}
+## ---------------------------------------------------------------------------------------------
+# Outputs used for constraining the model
+## ---------------------------------------------------------------------------------------------
+ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
+yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
+Y_const_stan <- standard_modern_value[ynames_const]
+
+
+scalevec <- c(1e12/ysec, 1e12/ysec, 1e12, 1e12)
+#Y_const_level1a_scaled <- sweep(Y_const_level1a, 2, STATS = scalevec, FUN = '/' )
+#Y_const_stan_scaled <- Y_const_stan / scalevec
+
+Y_const_wave00 <- sweep(Y[, ynames_const] ,  2, STATS = scalevec, FUN = '/' )
+Y_const_wave01 <- sweep(ens_wave01_mv$datmat[, ynames_const], 2, STATS = scalevec, FUN = '/' )
+
+par(mfrow = c(2,2))
+
+for(i in 1:ncol(Y_const_wave00)){
+  
+  
+  plot(1:499, Y_const_wave00[,i], xlim = c(0,900), ylab = colnames(Y_const_wave00)[i])
+  points(500:899, Y_const_wave01[,i], col= 'red')
+}
+
+
+```
+
+
+```{r}
+
+nroy_ix_wave00_mv <- which(Y_const_wave00[, 'nbp_lnd_sum'] > 0 &
+                                  Y_const_wave00[,'npp_nlim_lnd_sum'] > 35 &
+                                  Y_const_wave00[,'npp_nlim_lnd_sum'] < 80 &
+                                  Y_const_wave00[,'cSoil_lnd_sum'] > 750 &
+                                  Y_const_wave00[,'cSoil_lnd_sum'] < 3000 &
+                                  Y_const_wave00[,'cVeg_lnd_sum'] > 300 &
+                                  Y_const_wave00[,'cVeg_lnd_sum'] < 800
+)
+
+
+Y_wave00_nroy <- rep('RULEDOUT', nrow(Y_const_wave00))
+Y_wave00_nroy[nroy_ix_wave00_mv] <- 'NROY'
+
+Y_wave00_nroy <- as.factor(Y_wave00_nroy)
+
+```
+
+
+
+```{r, fig.width = 12, fig.height = 12}
+pairs(X[nroy_ix_wave00_mv, ], gap = 0,  xlim = c(0,1), ylim = c(0,1), upper.panel = NULL)
+
+```
+
+```{r}
+
+nroy_ix_wave01_mv <- which(Y_const_wave01[, 'nbp_lnd_sum'] > 0 &
+                                  Y_const_wave01[,'npp_nlim_lnd_sum'] > 35 &
+                                  Y_const_wave01[,'npp_nlim_lnd_sum'] < 80 &
+                                  Y_const_wave01[,'cSoil_lnd_sum'] > 750 &
+                                  Y_const_wave01[,'cSoil_lnd_sum'] < 3000 &
+                                  Y_const_wave01[,'cVeg_lnd_sum'] > 300 &
+                                  Y_const_wave01[,'cVeg_lnd_sum'] < 800
+)
+
+
+Y_wave01_nroy <- rep('RULEDOUT', nrow(Y_const_wave01))
+Y_wave01_nroy[nroy_ix_wave01_mv] <- 'NROY'
+
+Y_wave01_nroy <- as.factor(Y_wave01_nroy)
+
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+pairs(X[nroy_ix_wave01_mv, ], gap = 0,  xlim = c(0,1), ylim = c(0,1), upper.panel = NULL)
+
+```
+```{r}
+
+X_wave00 <- X
+
+# Synchronise output data sets
+Y_wave00 <- Y[ , colnames(ens_wave01_mv$datmat)]
+Y_wave01 <- ens_wave01_mv$datmat
+standard_mv <- standard_modern_value[colnames(ens_wave01_mv$datmat)]
+lhs_wave01 <- lhs_wave01[1:400, ]
+
+save(X_wave00, X_wave01, Y_wave00, Y_wave01, Y_wave00_nroy, Y_wave01_nroy, standard_mv, lhs, file = 'data/jules_class_summary.RData')
+
+
+```
+
+
+
 

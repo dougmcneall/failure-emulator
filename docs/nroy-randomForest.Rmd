@@ -1,0 +1,112 @@
+---
+title: "nroy-randomForest"
+author: "Doug McNeall"
+date: "9/28/2023"
+output: html_document
+---
+
+
+Using a randomForest to find parameter space regions where JULES-ES-1.0 produces output that looks (enough) like the real world. 
+
+Useful tutorial for random forests in R:  
+https://www.r-bloggers.com/2021/04/random-forest-in-r/
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+set.seed(42)
+
+library(RColorBrewer)
+library(e1071)
+library(MASS)
+library(caret)
+
+library(randomForest)
+
+```
+
+
+```{r}
+load('data/jules_class_summary.RData')
+
+```
+
+
+```{r}
+
+
+wave00 <- data.frame(X_wave00,  y = Y_wave00_nroy)
+
+ix_train <- 1:399
+ix_test <- 400:499
+
+train <- wave00[ix_train, ]
+test <- wave00[ix_test, ]
+
+```
+
+
+## Strategies for dealing with imbalanced class sizes
+
+https://stats.stackexchange.com/questions/168415/random-forest-in-r-using-unbalanced-data
+
+https://stats.stackexchange.com/questions/163251/creating-a-test-set-with-imbalanced-data/163567#163567
+
+
+```{r}
+
+cw <- 1 - ( table(Y_wave00_nroy) / length(Y_wave00_nroy)) 
+
+ss <- rep(min(table(train$y)), 2)
+cw = c(1000,1)
+
+rf <- randomForest(y~., data=train, classwt = cw, proximity = TRUE, ntree = 1000 )
+print(rf)
+
+```
+
+
+```{r}
+p1 <- predict(rf, train)
+confusionMatrix(p1, train$y)
+```
+
+
+## Confusion matrix for the test set
+
+```{r}
+
+p2 <- predict(rf, test)
+confusionMatrix(p2, test$y)
+
+```
+
+
+```{r}
+plot(rf)
+```
+
+```{r}
+
+
+t <- tuneRF(train[,-5], train[,5],
+       stepFactor = 0.5,
+       plot = TRUE,
+       ntreeTry = 150,
+       trace = TRUE,
+       improve = 0.05)
+
+```
+
+```{r}
+#Variable Importance
+varImpPlot(rf,
+           sort = T,
+           n.var = 10,
+           main = "Top 10 - Variable Importance")
+
+```
+
