@@ -9,9 +9,9 @@ Summary output at the end of the historical period is captured as the mean of th
 
 ## Data
 
-lhs: . . . . . . .  499 ensemble member input configurations, each of 32 input parameters. Input parameters are "multiplication factors" of the standard set of JULES-ES-1.0 parameters..
-X: . . . . . . . .  lhs normalized to a 0-1 scale.
-Y: . . . . . . . .  Global mean or sum output of land surface quantities for the years 1994 - 2013, each row matches the corresponding row of lhs and X.
-Y_char:. . . . . .  Character vector describing the result of the run
-Y_factor:. . . . .  Factor vector of Y_char
-wave0_summary_df:.  data frame combining X, Y and Y_char
+lhs: . . . . . . .  499 ensemble member input configurations, each of 32 input parameters. Input parameters are "multiplication factors" of the standard set of JULES-ES-1.0 parameters.  
+X: . . . . . . . .  lhs normalized to a 0-1 scale.  
+Y: . . . . . . . .  Global mean or sum output of land surface quantities for the years 1994 - 2013, each row matches the corresponding row of lhs and X.  
+Y_char:. . . . . .  Character vector describing the result of the run.  
+Y_factor:. . . . .  Factor vector of Y_char.  
+wave0_summary_df:.  data frame combining X, Y and Y_char.  

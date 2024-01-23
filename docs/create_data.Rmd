@@ -160,6 +160,8 @@ wave0_summary_df <- cbind(X, Y, Y_char, Y_factor)
 
 save(lhs, X, Y, Y_char, Y_factor, wave0_summary_df,  file = 'data/wave0_summary.RData')
 
+write.table(as.data.frame(wave0_summary_df), file = 'data/wave0_summary.csv', row.names = FALSE, quote = FALSE)
+
 
 ```
 
