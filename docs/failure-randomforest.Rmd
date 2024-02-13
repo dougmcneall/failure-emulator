@@ -5,8 +5,13 @@ date: "9/14/2023"
 output: html_document
 ---
 
+Predict which parameter values will lead to a failure of JULES-ES-1.0 to produce a credible land surface simulation.  
+JULES-ES-1.0 has a number of parameters, the values of which are uncertain, that can be changed to alter the behaviour of the model (and resulting land surface simulation).  
 
-Using a randomForest to find lowcarbon and crash locations in the JULES ensemble. 
+Choosing random but initially plausible values of these parameters can lead the model to crash (denoted CRASHED), or to produce land surface simulations that contain very little or no carbon (denoted LOWCARBON). Knowing regions of parameter space that would lead to plausible simulations would help us avoid unnecessary computational expense, and help us understand which regions of parameter space we might include to make plausible projections of the future land surface.
+
+Data is from McNeall et al (2024) Constraining the carbon cycle of JULES-ES-1.0
+
 
 Useful tutorial for random forests in R:  
 https://www.r-bloggers.com/2021/04/random-forest-in-r/
@@ -29,6 +34,8 @@ library(randomForest)
 ```
 
 ```{r}
+# Summary data frame
+
 load('data/wave0_summary.RData')
 
 ```
@@ -79,7 +86,7 @@ legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.1, bty = 'n')
 legend('topleft', pch = 19, col = c('red', 'blue'), legend = c('CRASHED', 'LOWCARBON'), bty = 'n', inset = 0.02, cex = 1.1 )
 
 ```
-
+## Split the data into train and test sets
 
 ```{r}
 
@@ -94,10 +101,15 @@ test <- data_df[ix_test, ]
 
 ```
 
+## Build an initial random forest
+
+There are a number of ways to alter this random forest, to try and make it better. A simple way is to tune "mtry", away from the standard number of sqrt(ncol(X)).  
+
+In this version, we've stratified and oversampled the rarer classes, in order to better highlight CRASHED cases. These tend not to be predicted at all in a standard random forest.
 
 ```{r}
 
-rf <- randomForest(y~., data=train, proximity=TRUE)
+rf <- randomForest(y~., data=train, mtry = 13, proximity=TRUE, strata = train$y, sampsize = c(10, 10, 10))
 print(rf)
 
 ```
@@ -111,22 +123,35 @@ confusionMatrix(p1, train$y)
 
 ## Confusion matrix for the test set
 
+The random forest has trouble correctly predicting the CRASHED ensemble members.
+
 ```{r}
 
 p2 <- predict(rf, test)
 confusionMatrix(p2, test$y)
 
+
 ```
+
+## Build a probabilistic random forest classifier
+
+We can see that the classifier assigns non-zero probabilities to the CRASHED ensemble members.  
+
 ```{r}
 
 p3 <- predict(rf, test, type = 'prob')
 
+head(data.frame(p3, test$y))
+
 ```
 
+## Plot the probability of assigning CRASHED (etc.) in input space
 
 ```{r}
 
+
 mat_unif <- function(nr, nc, cn = NULL){
+  # Function for sampling from a uniform hypercube
   
   nsamp <- nc*nr
   samp <- runif(nsamp)
@@ -140,21 +165,54 @@ xpred <- mat_unif(nr = 500, nc = ncol(X), cn = colnames(X))
 
 ```
 
+Predict at the sampled inputs
+
 ```{r}
 
 p4 <- predict(rf, xpred, type = 'prob')
-
-
 ```
 
-```{r}
+```{r, fig.width = 8, fig.height = 9}
 library(viridis)
+library(fields)
 
 
-cols <- viridis(10)[as.numeric(cut(p4[,2],breaks = 10))]
+cols_crashed <- viridis(10)[as.numeric(cut(p4[,1],breaks = 10))]
+cols_lowcarbon <- viridis(10)[as.numeric(cut(p4[,2],breaks = 10))]
+cols_ran <- viridis(10)[as.numeric(cut(p4[,3],breaks = 10))]
 
+par(mfrow = c(2,2), oma = c(6, 0.1, 0.1, 0.1))
 #plot(dat$x,dat$y,pch = 20,col = dat$Col)
-plot(xpred[,4 ], xpred[,15], col = cols, pch = 19)
+
+
+plot(xpred[,4], xpred[,8],
+     xlab = colnames(X)[4], ylab = colnames(X)[8],
+     col = cols_crashed,
+     pch = 19,
+     main = 'CRASHED')
+
+plot(xpred[,4], xpred[,8],
+     col = cols_lowcarbon,
+      xlab = colnames(X)[4], ylab = colnames(X)[8],
+     pch = 19,
+     main = 'LOWCARBON')
+
+plot(xpred[,4], xpred[,8],
+      xlab = colnames(X)[4], ylab = colnames(X)[8],
+     col = cols_ran,
+     pch = 19,
+     main = 'RAN')
+
+reset()
+
+
+
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = viridis(10),
+           legend.args = list(text = 'Probability', side = 3, line = 1),
+           legend.shrink = 0.5,
+           horizontal = TRUE)
 
 ```
 
@@ -163,7 +221,7 @@ plot(xpred[,4 ], xpred[,15], col = cols, pch = 19)
 
 pairs(xpred,
       gap = 0.2,
-      col = cols,
+      col = cols_ran,
       pch = 19,
       cex = 0.5,
       lower.panel = NULL,
@@ -179,8 +237,8 @@ library(fields)
 image.plot(legend.only = TRUE,
            zlim = c(0,1),
            col = viridis(10),
-           legend.args = list(text = 'Probability of model failure due to LOWCARBON', side = 3, line = 1),
-           legend.shrink = 0.6,
+           legend.args = list(text = 'Probability that model runs', side = 3, line = 1),
+           legend.shrink = 0.7,
            horizontal = TRUE)
 
 
@@ -196,10 +254,10 @@ plot(rf)
 
 
 ```{r}
-t <- tuneRF(train[,-5], train[,5],
-       stepFactor = 0.5,
+t <- tuneRF(train[,-33], train[,33],
+       stepFactor = 0.3,
        plot = TRUE,
-       ntreeTry = 150,
+       ntreeTry = 200,
        trace = TRUE,
        improve = 0.05)
 
@@ -251,54 +309,7 @@ MDSplot(rf, train$y)
 ```
 
 
-## Sample from the whole input space and make predictions
 
-```{r}
-samp <- runif(16000)
-
-samp_mat <- matrix(data = samp, nrow = 500)
-
-colnames(samp_mat) <- colnames(X)
-
-samp_pred <- predict(rf, samp_mat)
-
-```
-
-
-```{r, fig.width = 7, fig.height = 7}
-
-pal = c('red', 'blue','grey')
-plot(samp_mat[,4], samp_mat[,8], col = pal[samp_pred], xlab = colnames(X)[4], ylab = colnames(X)[8])
-
-```
-
-## The pairs plot looks very similar to the test data set at the start of the page
-```{r, fig.width = 12, fig.height = 12}
-
-pairs(
-  samp_mat[samp_pred=='LOWCARBON', ],
-  gap = 0,
-  col = 'blue',
-  upper.panel = NULL,
-  pch = 20,
-  labels = 1:d
-  
-)
-
-reset()
-
-legend('right', legend = paste(1:d, colnames(lhs)), cex = 1.1, bty = 'n')
-legend('topright', pch = 19, col = c('red', 'blue'), legend = c('failed', 'zero carbon cycle'), bty = 'n', inset = 0.02, cex = 1.1 )
-
-
-```
-## Density of lowcarbon
-
-```{r}
-
-
-
-```
 
 # How does classifier accuracy change with ensemble size? 
 
@@ -309,36 +320,36 @@ legend('topright', pch = 19, col = c('red', 'blue'), legend = c('failed', 'zero 
 # set of ntrain rows and a test set of ntest rows, trains the model, predicts the
 # test set and records the misclassification rate for each rep in the oputput.
 
-boot_rf <- function(data, ntrain, ntest, nreps){
-  
-  outvec <- rep(NA, nreps)
-    
-  for(i in 1:nreps){
-    
-    n_train_and_test <- ntrain+ntest
-    
-    all_samp_ix <- sample(1:nrow(X), n_train_and_test)
-    train_ix <- all_samp_ix[1:ntrain]
-    test_ix <- all_samp_ix[(ntrain+1):n_train_and_test]
-    
-    train <- data[train_ix, ]
-    test  <- data[test_ix ,]
-    
-    
-    rf <- randomForest(y~., data=train, proximity=TRUE)
-    
-      
-    pred_test <- predict(rf, test)
-    conf_test <- confusionMatrix(pred_test, test$y)
-    
-    out <- (1 - conf_test$overall['Accuracy'])
-    outvec[i] <- out
-    
-  }
-  
-  outvec
-  
-}
+# boot_rf <- function(data, ntrain, ntest, nreps){
+#   
+#   outvec <- rep(NA, nreps)
+#     
+#   for(i in 1:nreps){
+#     
+#     n_train_and_test <- ntrain+ntest
+#     
+#     all_samp_ix <- sample(1:nrow(X), n_train_and_test)
+#     train_ix <- all_samp_ix[1:ntrain]
+#     test_ix <- all_samp_ix[(ntrain+1):n_train_and_test]
+#     
+#     train <- data[train_ix, ]
+#     test  <- data[test_ix ,]
+#     
+#     
+#     rf <- randomForest(y~., data=train, proximity=TRUE)
+#     
+#       
+#     pred_test <- predict(rf, test)
+#     conf_test <- confusionMatrix(pred_test, test$y)
+#     
+#     out <- (1 - conf_test$overall['Accuracy'])
+#     outvec[i] <- out
+#     
+#   }
+#   
+#   outvec
+#   
+# }
 
 
 ```
@@ -346,7 +357,7 @@ boot_rf <- function(data, ntrain, ntest, nreps){
 
 ```{r}
 # test the above
-test_boot <- boot_rf(data = data_df, ntrain = 100, ntest = 10, nreps = 10)
+# test_boot <- boot_rf(data = data_df, ntrain = 100, ntest = 10, nreps = 10)
 
 ```
 
@@ -354,19 +365,19 @@ test_boot <- boot_rf(data = data_df, ntrain = 100, ntest = 10, nreps = 10)
 
 ```{r}
 
-nreps <- 50
-
-nens_vec <- seq(from = 100, to = 400, by = 20)
-
-outmat <- matrix(nrow = nreps, ncol = length(nens_vec))
-
-for(j in 1:length(nens_vec)){
-  
-  boot_rf_out  <- boot_rf(data = data_df, ntrain = nens_vec[j], ntest = 50, nreps = nreps)
-  
-  outmat[, j] <- boot_rf_out
-  
-}
+# nreps <- 50
+# 
+# nens_vec <- seq(from = 100, to = 400, by = 20)
+# 
+# outmat <- matrix(nrow = nreps, ncol = length(nens_vec))
+# 
+# for(j in 1:length(nens_vec)){
+#   
+#   boot_rf_out  <- boot_rf(data = data_df, ntrain = nens_vec[j], ntest = 50, nreps = nreps)
+#   
+#   outmat[, j] <- boot_rf_out
+#   
+# }
 
 
 ```
@@ -374,9 +385,9 @@ for(j in 1:length(nens_vec)){
 ```{r}
 
 # 1- accuracy mean
-oma_mean <- apply(outmat,2,mean)
-
-plot(nens_vec, oma_mean, type = 'b' )
+# oma_mean <- apply(outmat,2,mean)
+# 
+# plot(nens_vec, oma_mean, type = 'b' )
 
 
 ```
@@ -384,7 +395,7 @@ plot(nens_vec, oma_mean, type = 'b' )
 ```{r}
 
 
-boxplot( outmat)
+# boxplot( outmat)
 ```
 
 
